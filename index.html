@@ -149,6 +149,21 @@
         .leave-btn:hover {
             background: #c82333;
         }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        
+        .history-divider {
+            text-align: center;
+            color: #6c757d;
+            margin: 20px 0;
+            font-size: 14px;
+            border-top: 1px solid #e1e5e9;
+            padding-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -214,7 +229,7 @@
             const message = messageInput.value.trim();
             if (message && currentRoom) {
                 socket.emit('message', { room: currentRoom, message: message, username: currentUsername });
-                addMessage('You', message, true);
+                addMessage('You', message, true, new Date().toISOString());
                 messageInput.value = '';
             }
         }
@@ -239,9 +254,28 @@
             addNotification(`You have joined the room: ${data.room}`);
         });
 
+        socket.on('room_history', (data) => {
+            console.log('Received room history:', data);
+            if (data.messages && data.messages.length > 0) {
+                // Add history divider
+                addHistoryDivider();
+                
+                // Add historical messages
+                data.messages.forEach(msg => {
+                    const isMine = msg.username === currentUsername;
+                    addMessage(
+                        isMine ? 'You' : msg.username, 
+                        msg.message, 
+                        isMine, 
+                        msg.timestamp
+                    );
+                });
+            }
+        });
+
         socket.on('new_message', (data) => {
             console.log('Received new message:', data);
-            addMessage(data.sender, data.message, false);
+            addMessage(data.sender, data.message, false, data.timestamp);
         });
         
         socket.on('user_joined', (data) => {
@@ -267,14 +301,24 @@
         });
 
         // UI helper functions
-        function addMessage(sender, message, isMine) {
+        function addMessage(sender, message, isMine, timestamp) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
             messageElement.classList.add(isMine ? 'my-message' : 'other-message');
             
             const messageContent = document.createElement('div');
             messageContent.classList.add('message-content');
-            messageContent.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            
+            const messageText = document.createElement('div');
+            messageText.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            messageContent.appendChild(messageText);
+            
+            if (timestamp) {
+                const timestampElement = document.createElement('div');
+                timestampElement.classList.add('timestamp');
+                timestampElement.textContent = formatTimestamp(timestamp);
+                messageContent.appendChild(timestampElement);
+            }
             
             messageElement.appendChild(messageContent);
             messagesDiv.appendChild(messageElement);
@@ -287,6 +331,22 @@
             notificationElement.innerText = message;
             messagesDiv.appendChild(notificationElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function addHistoryDivider() {
+            const dividerElement = document.createElement('div');
+            dividerElement.classList.add('history-divider');
+            dividerElement.textContent = '--- Message History ---';
+            messagesDiv.appendChild(dividerElement);
+        }
+        
+        function formatTimestamp(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            } catch (e) {
+                return timestamp;
+            }
         }
     </script>
 </body>
